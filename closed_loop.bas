@@ -8,8 +8,9 @@ setup:
 
     let setpoint = 95                               ; initialise desired speed
     let duty = 95                                   ; initialise duty cycle
-
-    adcconfig %000                                  ; Vref- is 0V, Vref+ is V+
+    
+    FVRSETUP FVR4096
+    adcconfig %001                                  ; Vref- is 0V, Vref+ is V+
     hpwm 1, 0, 0, 79, duty                          ; complementary pwm at 100kHz
 
 main:
