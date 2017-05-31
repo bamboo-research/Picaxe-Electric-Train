@@ -14,20 +14,16 @@
 ;            and reverse. In closed loop mode, there is
 ;            a fixed speed setpoint.
 ;======================================================
-
-#DEFINE OPEN_LOOP   0                               ; open loop state
-#DEFINE CLOSED_LOOP 1                               ; closed loop state
-#DEFINE SETPOINT 95                                 ; closed loop SETPOINT reference
-
     setfreq M32
 
     SYMBOL mode = b0
     SYMBOL sensor = b1
     SYMBOL duty = b2
-    SYMBOL pot = b3
-    SYMBOL duty = b4
+    SYMBOL poten = b3
+    SYMBOL setpoint = b4
 
-    SYMBOL MODE_BUTTON = B.0
+    SYMBOL MODE_BUTTON = pinC.3
+    SYMBOL STOP_BUTTON = pinC.4
     SYMBOL SPEED_SENSOR = B.1
     SYMBOL POTENTIOMETER = B.2
     SYMBOL OPEN_LED = B.3
@@ -35,74 +31,89 @@
 
 setup:
 
-    let state = OPEN_LOOP                           ; initialise in open loop state
-    adcconfig %000                                  ; Vref- is 0V, Vref+ is V+
-    setint %00000001,%00000001                      ; interrupt on input 0 high
+    let mode = 0
+    let setpoint = 95                       
+    gosub openLoopSetup
+    
+    FVRSETUP FVR4096
+    adcconfig %001                                  ; Vref- is 0V, Vref+ is V+
 
 main:
 
-    IF mode = OPEN_LOOP                             ; open loop state
-    goto openLoop
-    ELSEIF mode = CLOSED_LOOP                       ; closed loop state
-    goto closedLoop
+    
+    IF MODE_BUTTON = 1 THEN
+    pause 500
+    IF MODE_BUTTON = 1 THEN
+    gosub stateChange
+    ENDIF
+    ENDIF	
+    
+    IF STOP_BUTTON = 1 THEN
+    pause 500
+    IF STOP_BUTTON = 1 THEN
+    gosub eStop
+    ENDIF
+    ENDIF
 
+    IF mode = 0 THEN                                ; open loop state
+    goto openLoop
+    ELSEIF mode = 1 THEN                            ; closed loop state
+    goto closedLoop
+    ELSEIF mode = 2 THEN
+    goto stopState
+    ENDIF
+    
 openLoop:
 
     pause 100                                       ; wait for 0.5 s
-    readadc POTENTIOMETER, pot                      ; read potentiometer
+    readadc POTENTIOMETER, poten                    ; read potentiometer
 
-    IF pot >= 0 AND pot <  51 THEN
+    IF poten >= 0 AND poten <  51 THEN
     let duty = 191                                  ; slow reverse
-    ELSEIF pot >= 51 AND pot < 102 THEN
+    ELSEIF poten >= 51 AND poten < 102 THEN
+    let duty = 160                                  ; stop
+    ELSEIF poten >= 102 AND poten < 153 THEN
     let duty = 127                                  ; slow forward
-    ELSEIF pot >= 102 AND pot < 153 THEN
+    ELSEIF poten >= 153 AND poten < 204 THEN
     let duty = 95                                   ; medium forward
-    ELSEIF pot >= 153 AND pot < 204 THEN
+    ELSEIF poten >= 204 AND poten < 255 THEN
     let duty = 47                                   ; fast forward
-    ELSEIF pot >= 204 AND pot < 255 THEN
-    let duty = 0                                    ; very fast forward
-
+    ENDIF
+    
     hpwm 1, 0, 0, 79, duty                          ; complementary pwm at 100kHz
 
     goto main
 
 closedLoop:
 
-    pause 500                                       ; wait for 0.5 s
+    pause 300                                       ; wait for 0.5 s
     readadc SPEED_SENSOR, sensor                    ; implement feedback from sensor
     sertxd(#sensor, "  ", #duty, cr, lf)            ; debugging
 
-    if sensor > SETPOINT AND duty < 159 THEN        ; if sensed speed is too slow
+    if sensor > setpoint AND duty < 159 THEN        ; if sensed speed is too slow
     inc duty                                        ; slow down motor
     endif
-    if sensor < SETPOINT AND duty > 5 THEN          ; if sensed speed is too fast
+    if sensor < setpoint AND duty > 5 THEN          ; if sensed speed is too fast
     dec duty                                        ; speed up motor
     endif
-    if sensor = SETPOINT THEN                       ; if the speed is correct
-    duty = duty                                     ; use the dame duty cycle
+    if sensor = setpoint THEN                       ; if the speed is correct
+    let duty = duty                                 ; use the dame duty cycle
     endif
 
     hpwm 1, 0, 0, 79, duty                          ; set pwm
 
     goto main
+    
+    
+stopState:
 
-interrupt:
-
-    IF mode = OPEN_LOOP THEN                        ; Switch modes on interrupt
-    mode = CLOSED_LOOP
-    gosub closedLoopSetup
-    ELSEIF mode = CLOSED_LOOP THEN
-    mode = OPEN_LOOP
-    gosub openLoopSetup
-    ENDIF
-
-    setint %00000001,%00000001                      ; set interrupt again
-
-    return
+    sertxd("E-Stop", cr, lf)
+    high OPEN_LED                                    ; change state LEDs
+    high CLOSED_LED
+    goto main 
 
 closedLoopSetup:
 
-    let SETPOINT = 95                               ; initialise desired speed
     let duty = 95                                   ; initialise duty cycle
     low OPEN_LED                                    ; change state LEDs
     high CLOSED_LED
@@ -117,3 +128,27 @@ openLoopSetup:
     low CLOSED_LED
 
     return
+    
+stateChange:
+
+    IF mode = 0 THEN                               
+    let mode = 1
+    gosub closedLoopSetup
+    ELSEIF mode = 1 THEN
+    let mode = 0
+    gosub openLoopSetup
+    ELSEIF mode = 2 THEN
+    let mode = 0
+    gosub openLoopSetup
+    ENDIF
+
+    return  
+    
+eStop:
+
+    let mode = 2
+    let duty = 160
+    hpwm 1, 0, 0, 79, duty
+    
+    return
+      
