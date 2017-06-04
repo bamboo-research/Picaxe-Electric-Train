@@ -11,6 +11,9 @@ This project is programmed in the BASIC programming language for the PICAXE.
 
 The train has an open loop and a closed loop mode. In the open loop mode, the speed is changed using a potentiometer and drives forwards and reverse. In closed loop mode, there is a fixed speed setpoint. Feedback is implemented by operating a DC motor as a generator. The generator output is fed through a voltage divider and low-pass filter to step-down the voltage and remove high frequency noise.
 
+### State Diagram
+![](https://github.com/martinabeleda/picaxe-electric-train/blob/master/train-state-diagram.png)
+
 ## Hardware
 * PICAXE
 * H-Bridge board
