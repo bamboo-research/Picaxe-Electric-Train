@@ -14,6 +14,9 @@ The train has an open loop and a closed loop mode. In the open loop mode, the sp
 ### State Diagram
 ![](https://github.com/martinabeleda/picaxe-electric-train/blob/master/train-state-diagram.png)
 
+### Interface Design
+![](https://github.com/martinabeleda/picaxe-electric-train/blob/master/user-interface.png)
+
 ## Hardware
 * PICAXE
 * H-Bridge board
